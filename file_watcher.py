@@ -23,7 +23,10 @@ class FileWatcher:
             return False
 
     def watch_dirs(self, dirs):
+        # select only folders
         dirs = list(filter(os.path.isdir, dirs))
+        # to remove weird folders on NAS
+        dirs = [d for  d in dirs if '@' not in d]
         print(f'watching directories: {dirs}')
         dirs_count = self._count_dirs()
         print(f'dirs count: {dirs_count}')
@@ -32,26 +35,30 @@ class FileWatcher:
             pool.map(self._watch_files, recordings)
 
     def _count_dirs(self):
-        return len(list(filter(os.path.isdir, glob('test_dir/*'))))
+        return len(list(filter(os.path.isdir, glob(f'{os.environ.get("LUKOSHKO_DIR")}/*'))))
 
     def _watch_files(self, recording):
         filename = self._get_latest_filename(recording.dir)
+        print(f'watching file: {filename}')
         while True:
             file_size = os.path.getsize(filename)
             time.sleep(self.check_interval)
+            print(f'{os.path.getsize(filename) - file_size}')
             if file_size == os.path.getsize(filename):
                 if self._is_new_file(filename, recording.dir):
                     filename = self._get_latest_filename(recording.dir)
                     recording.is_active = True
                 else:
                     recording.is_active = False
+            elif file_size < os.path.getsize(filename):
+                recording.is_active = True
 
 
 class Recording:
     def __init__(self, bot, chat_id, dir):
         self.bot = bot
         self.chat_id = chat_id
-        self._is_active = False
+        self._is_active = None
         self.dir = dir
 
     @property
@@ -64,13 +71,12 @@ class Recording:
             print(f'value changed\n previous value: {self._is_active}\n current_value: {value}')
             self._is_active = value
             self._send_message_to_bot(self.dir, value)
-        else:
-            print(f'value stays the same: {value}')
 
     def _send_message_to_bot(self, dir, is_recording):
-        message = f'{dir}\n'
+        message = f'{dir.split("/")[-1]}\n'
         if is_recording:
             message += 'Recording is fine'
         else:
             message += '!!!RECORDING HAS STOPPED!!!'
+        print(message)
         self.bot.send_message(chat_id=self.chat_id, text=f'{time.ctime()}\n{message}')
