@@ -1,5 +1,7 @@
 import os
 import time
+import requests
+import datetime
 from glob import glob
 from multiprocessing import Pool
 
@@ -43,6 +45,7 @@ class FileWatcher:
         while True:
             file_size = os.path.getsize(filename)
             time.sleep(self.check_interval)
+            requests.post(os.getenv("LUKOVICA_URL"), data={'time': datetime.datetime.utcnow(), 'lukoshko': True}, headers={'token': os.getenv('LUKOVICA_TOKEN')})
             print(f'{os.path.getsize(filename) - file_size}')
             if file_size == os.path.getsize(filename):
                 if self._is_new_file(filename, recording.dir):
